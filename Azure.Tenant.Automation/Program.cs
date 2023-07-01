@@ -23,8 +23,9 @@ internal class Program
         ArmClient azure = new(new DefaultAzureCredential());
         var httpClient = new HttpClient();
         Uri baseUri = new("https://management.azure.com/");
-        string targetTenant = "d49110b2-6f26-4c66-b723-1729cdb9a3cf";
-        string targetSubscription = "cb70135b-a87f-47c4-adc2-9e172bc22f88";
+        const string targetTenant = "d49110b2-6f26-4c66-b723-1729cdb9a3cf";
+        const string targetSubscription = "cb70135b-a87f-47c4-adc2-9e172bc22f88";
+        const string targetResourceGroup = "rg-devops-dv";
 
         var tagsToCheck = new Dictionary<string, string>()
         {
@@ -95,17 +96,20 @@ internal class Program
                     }
                 }
             }
+            else
+            {
+                Console.WriteLine($"No tags on resource {subscription.Data.DisplayName}");
+            }
         }
 
         async Task UpdateResourceGroupsTags(SubscriptionResource subscription)
         {
-
             // TODO update to use default tags object
             //var tags = group.GetTagResource();
             await foreach (ResourceGroupResource group in subscription.GetResourceGroups())
             {
                 string resourceGroupName = group.Data.Name;
-                if (resourceGroupName != "rg-devops-dv") continue;
+                if (!String.IsNullOrEmpty(resourceGroupName) && resourceGroupName != targetResourceGroup) continue;
                 var tags = group.Data.Tags;
                 string? result = await httpClient.GetStringAsync(new Uri(baseUri, $"subscriptions/{subscription.Data.SubscriptionId}/resourceGroups/{resourceGroupName}?api-version=2014-04-01"));
                 ResourceGroup? resourceGroup = JsonSerializer.Deserialize<ResourceGroup>(result);
@@ -145,6 +149,10 @@ internal class Program
                         await group.SetTagsAsync(tagsToUpdate);
                     }
                     await UpdateResourceTags(subscription, group);
+                }
+                else
+                {
+                    Console.WriteLine($"No tags on resource {resourceGroup?.Name}");
                 }
             }
         }
@@ -191,6 +199,10 @@ internal class Program
 
                             await resource.SetTagsAsync(tagsToUpdate);
                         }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"No tags on resource {resource.Data.Name}");
                     }
                 }
             }
