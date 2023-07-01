@@ -54,24 +54,24 @@ internal class Program
             if (tagsToChange?.Count > 0)
             {
                 var tagsToUpdate = tagsToChange.ToDictionary(x => x.Key, x => x.Value);
-                foreach (var tag in tagsToChange)
+                tagsToChange.ForEach(tag =>
                 {
                     Console.WriteLine($"Changing tag {tag.Key} to {tagsToCheck[tag.Key]} for {subscription.Data.DisplayName}");
                     // Add new tag key to subscription, retaining old value
                     tagsToUpdate[tagsToCheck[tag.Key]] = tag.Value;
                     // Remove old tag
                     tagsToUpdate.Remove(tag.Key);
-                }
-                const Azure.WaitUntil wait = new();
+                });
 
                 // ! For subscriptions only these tags will be left once the update runs
                 if(tagsToUpdate.Count > 0) {
                     Tag newTag = new();
-                    foreach (var tag in tagsToUpdate)
+                    tagsToUpdate.ForEach(tag =>
                     {
                         newTag.TagValues.Add(tag.Key, tag.Value);
-                    }
+                    });
                     TagResourceData newTags = new(newTag);
+                    const Azure.WaitUntil wait = new();
                     await tagResource.CreateOrUpdateAsync(wait, newTags);
                 }
             }
@@ -79,15 +79,15 @@ internal class Program
 
         async Task UpdateResourceGroupsTags(SubscriptionResource subscription)
         {
+
+            // TODO update to use default tags object
+            //var tags = group.GetTagResource();
             await foreach (ResourceGroupResource group in subscription.GetResourceGroups())
             {
                 string resourceGroupName = group.Data.Name;
-                // TODO update to use default tags object
-                //var tags = group.GetTagResource();
                 var tags = group.Data.Tags;
-                string? result = await httpClient.GetStringAsync(new Uri(baseUri, $"subscriptions/{subscription.Id}/resourceGroups/{resourceGroupName}?api-version=2014-04-01"));
+                string? result = await httpClient.GetStringAsync(new Uri(baseUri, $"subscriptions/{subscription.Data.SubscriptionId}/resourceGroups/{resourceGroupName}?api-version=2014-04-01"));
                 ResourceGroup? resourceGroup = JsonSerializer.Deserialize<ResourceGroup>(result);
-
 
                 var tagsToChange = resourceGroup?.Tags?
                     .Where(tag => tagsToCheck.ContainsKey(tag.Key))
@@ -96,7 +96,7 @@ internal class Program
                 if (tagsToChange?.Count > 0)
                 {
                     var tagsToUpdate = tagsToChange.ToDictionary(x => x.Key, x => x.Value);
-                    foreach (var tag in tagsToChange)
+                    tagsToChange.ForEach(tag =>
                     {
                         Console.WriteLine($"Changing tag {tag.Key} to {tagsToCheck[tag.Key]} for {resourceGroupName}");
                         var oldTagValue = tag.Value;
@@ -104,10 +104,17 @@ internal class Program
                         tagsToUpdate[tagsToCheck[tag.Key]] = oldTagValue;
                         // Remove old tag
                         tagsToUpdate.Remove(tag.Key);
-                    }
+                    });
                     await group.SetTagsAsync(tagsToUpdate);
                 }
+                await UpdateResourceTags(subscription, group);
             }
+        }
+
+        async Task UpdateResourceTags(SubscriptionResource subscription, ResourceGroupResource resourceGroup)
+        {
+            var resource = resourceGroup.GetGenericResourcesAsync();
+            // TODO wip
         }
 
         static async Task<string> GetAccessTokenAsync(TokenCredential credential, string scope)

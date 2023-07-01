@@ -10,9 +10,9 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/Mesh.Automation.Azure/bin/Debug/net6.0/Mesh.Automation.Azure.dll",
+            "program": "${workspaceFolder}/Tenant.Automation.Azure/bin/Debug/net6.0/Tenant.Automation.Azure.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/Mesh.Automation.Azure",
+            "cwd": "${workspaceFolder}/Tenant.Automation.Azure",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false
