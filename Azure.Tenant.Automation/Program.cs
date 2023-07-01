@@ -76,13 +76,6 @@ internal class Program
 
                     if (tagsToUpdate.Count > 0)
                     {
-                        Tag newTag = new();
-                        foreach (var tag in tagsToUpdate)
-                        {
-                            newTag.TagValues.Add(tag.Key, tag.Value);
-                        };
-                        TagResourceData newTags = new(newTag);
-
                         // Add the original tags that aren't being updated
                         foreach (var tag in originalTags)
                         {
@@ -91,6 +84,13 @@ internal class Program
                                 tagsToUpdate.Add(tag.Key, tag.Value);
                             }
                         }
+                        // Construct the TagResourceData object required to pass to subscription tag update
+                        Tag newTag = new();
+                        foreach (var tag in tagsToUpdate)
+                        {
+                            newTag.TagValues.Add(tag.Key, tag.Value);
+                        };
+                        TagResourceData newTags = new(newTag);
                         const Azure.WaitUntil wait = new();
                         await tagResource.CreateOrUpdateAsync(wait, newTags);
                     }
