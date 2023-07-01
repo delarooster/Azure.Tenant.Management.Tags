@@ -5,9 +5,19 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Resources.Models;
+using static Program;
 
 internal class Program
 {
+    /// <summary>
+    /// Small application to update the tags in Azure on subscriptions, resource groups, and resources.
+    /// Currently reads from a hard-coded Dictionary of targeted keys; the value is the intended transformation
+    /// e.g. Looking for "Client" tag key and updating to "Customer" tag key, retaining same value as prior
+    /// Starts by collecting all subscriptions a user is authenticated, then subscription by subscription
+    /// iterates over the list, updating tags on subscription, then its resource groups, and the resources
+    /// within the group.
+    /// </summary>
+    /// <returns></returns>
     private static async Task Main()
     {
         ArmClient azure = new(new DefaultAzureCredential());
@@ -25,12 +35,6 @@ internal class Program
 
         var token = await GetAccessTokenAsync(new DefaultAzureCredential(), "https://management.azure.com/");
         httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
-        //SubscriptionCollection subscriptions = azure.GetSubscriptions();
-        // get all the subscriptions
-        // make sure it's the correct tenant
-        // Update tags
-        // Then the resource groups in each sub
-        // Then the resources in each rg
 
         foreach (var sub in azure.GetSubscriptions())
         {
@@ -51,28 +55,44 @@ internal class Program
                     .Where(tag => tagsToCheck.ContainsKey(tag.Key))
                     .ToList();
 
-            if (tagsToChange?.Count > 0)
+            if (subscriptionTags != null)
             {
-                var tagsToUpdate = tagsToChange.ToDictionary(x => x.Key, x => x.Value);
-                tagsToChange.ForEach(tag =>
-                {
-                    Console.WriteLine($"Changing tag {tag.Key} to {tagsToCheck[tag.Key]} for {subscription.Data.DisplayName}");
-                    // Add new tag key to subscription, retaining old value
-                    tagsToUpdate[tagsToCheck[tag.Key]] = tag.Value;
-                    // Remove old tag
-                    tagsToUpdate.Remove(tag.Key);
-                });
+                // Save the original tags
+                var originalTags = new Dictionary<string, string>(subscriptionTags);
 
-                // ! For subscriptions only these tags will be left once the update runs
-                if(tagsToUpdate.Count > 0) {
-                    Tag newTag = new();
-                    tagsToUpdate.ForEach(tag =>
+                if (tagsToChange?.Count > 0)
+                {
+                    var tagsToUpdate = tagsToChange.ToDictionary(x => x.Key, x => x.Value);
+                    tagsToChange.ForEach(tag =>
                     {
-                        newTag.TagValues.Add(tag.Key, tag.Value);
+                        Console.WriteLine($"Changing tag {tag.Key} to {tagsToCheck[tag.Key]} for {subscription.Data.DisplayName}");
+                        // Add new tag key to subscription, retaining old value
+                        tagsToUpdate[tagsToCheck[tag.Key]] = tag.Value;
+                        // Remove old tag
+                        tagsToUpdate.Remove(tag.Key);
+                        originalTags.Remove(tag.Key);
                     });
-                    TagResourceData newTags = new(newTag);
-                    const Azure.WaitUntil wait = new();
-                    await tagResource.CreateOrUpdateAsync(wait, newTags);
+
+                    if (tagsToUpdate.Count > 0)
+                    {
+                        Tag newTag = new();
+                        foreach (var tag in tagsToUpdate)
+                        {
+                            newTag.TagValues.Add(tag.Key, tag.Value);
+                        };
+                        TagResourceData newTags = new(newTag);
+
+                        // Add the original tags that aren't being updated
+                        foreach (var tag in originalTags)
+                        {
+                            if (!tagsToUpdate.ContainsKey(tag.Key))
+                            {
+                                tagsToUpdate.Add(tag.Key, tag.Value);
+                            }
+                        }
+                        const Azure.WaitUntil wait = new();
+                        await tagResource.CreateOrUpdateAsync(wait, newTags);
+                    }
                 }
             }
         }
@@ -85,36 +105,95 @@ internal class Program
             await foreach (ResourceGroupResource group in subscription.GetResourceGroups())
             {
                 string resourceGroupName = group.Data.Name;
+                if (resourceGroupName != "rg-devops-dv") continue;
                 var tags = group.Data.Tags;
                 string? result = await httpClient.GetStringAsync(new Uri(baseUri, $"subscriptions/{subscription.Data.SubscriptionId}/resourceGroups/{resourceGroupName}?api-version=2014-04-01"));
                 ResourceGroup? resourceGroup = JsonSerializer.Deserialize<ResourceGroup>(result);
 
-                var tagsToChange = resourceGroup?.Tags?
-                    .Where(tag => tagsToCheck.ContainsKey(tag.Key))
-                    .ToList();
-
-                if (tagsToChange?.Count > 0)
+                if (resourceGroup?.Tags != null)
                 {
-                    var tagsToUpdate = tagsToChange.ToDictionary(x => x.Key, x => x.Value);
-                    tagsToChange.ForEach(tag =>
+                    // Save the original tags
+                    var originalTags = new Dictionary<string, string>(resourceGroup.Tags);
+
+                    var tagsToChange = resourceGroup?.Tags?
+                        .Where(tag => tagsToCheck.ContainsKey(tag.Key))
+                        .ToList();
+
+                    if (tagsToChange?.Count > 0)
                     {
-                        Console.WriteLine($"Changing tag {tag.Key} to {tagsToCheck[tag.Key]} for {resourceGroupName}");
-                        var oldTagValue = tag.Value;
-                        // Add new tag to resourceGroup
-                        tagsToUpdate[tagsToCheck[tag.Key]] = oldTagValue;
-                        // Remove old tag
-                        tagsToUpdate.Remove(tag.Key);
-                    });
-                    await group.SetTagsAsync(tagsToUpdate);
+                        var tagsToUpdate = tagsToChange.ToDictionary(x => x.Key, x => x.Value);
+                        tagsToChange.ForEach(tag =>
+                        {
+                            Console.WriteLine($"Changing tag {tag.Key} to {tagsToCheck[tag.Key]} for {resourceGroupName}");
+                            var oldTagValue = tag.Value;
+                            // Add new tag to resourceGroup
+                            tagsToUpdate[tagsToCheck[tag.Key]] = oldTagValue;
+                            // Remove old tag
+                            tagsToUpdate.Remove(tag.Key);
+                            originalTags.Remove(tag.Key);
+                        });
+
+                        // Add the original tags that aren't being updated
+                        foreach (var tag in originalTags)
+                        {
+                            if (!tagsToUpdate.ContainsKey(tag.Key))
+                            {
+                                tagsToUpdate.Add(tag.Key, tag.Value);
+                            }
+                        }
+
+                        await group.SetTagsAsync(tagsToUpdate);
+                    }
+                    await UpdateResourceTags(subscription, group);
                 }
-                await UpdateResourceTags(subscription, group);
             }
         }
 
         async Task UpdateResourceTags(SubscriptionResource subscription, ResourceGroupResource resourceGroup)
         {
-            var resource = resourceGroup.GetGenericResourcesAsync();
-            // TODO wip
+            var resources = resourceGroup.GetGenericResources();
+
+            if (resources != null)
+            {
+                foreach (var resource in resources)
+                {
+                    if (resource.Data?.Tags.Count > 0)
+                    {
+                        // Save the original tags
+                        var originalTags = new Dictionary<string, string>(resource.Data.Tags);
+
+                        var tagsToChange = originalTags
+                            .Where(tag => tagsToCheck.ContainsKey(tag.Key))
+                            .ToList();
+
+                        if (tagsToChange?.Count > 0)
+                        {
+                            var tagsToUpdate = tagsToChange.ToDictionary(x => x.Key, x => x.Value);
+                            tagsToChange.ForEach(tag =>
+                            {
+                                Console.WriteLine($"Changing tag {tag.Key} to {tagsToCheck[tag.Key]} for {resource.Data.Name}");
+                                var oldTagValue = tag.Value;
+                                // Add new tag to resource
+                                tagsToUpdate[tagsToCheck[tag.Key]] = oldTagValue;
+                                // Remove old tag
+                                tagsToUpdate.Remove(tag.Key);
+                                originalTags.Remove(tag.Key);
+                            });
+
+                            // Add the original tags that aren't being updated
+                            foreach (var tag in originalTags)
+                            {
+                                if (!tagsToUpdate.ContainsKey(tag.Key))
+                                {
+                                    tagsToUpdate.Add(tag.Key, tag.Value);
+                                }
+                            }
+
+                            await resource.SetTagsAsync(tagsToUpdate);
+                        }
+                    }
+                }
+            }
         }
 
         static async Task<string> GetAccessTokenAsync(TokenCredential credential, string scope)
