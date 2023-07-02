@@ -1,48 +1,71 @@
-# Azure Tag Updater
+# Azure Tag Update Utility
 
-This C# program is designed to update the tags in Azure subscriptions, resource groups, and resources. It currently reads from a hardcoded dictionary of targeted keys and applies the corresponding transformations. For example, it can change a "Client" tag key to a "Customer" tag key, retaining the same value as before.
+## Overview
 
-The program starts by collecting all subscriptions that the authenticated user has access to. Then, it iterates over each subscription, updating tags on the subscription itself, its resource groups, and the resources within each group.
+This is a utility developed to streamline the management of Azure resources. The application allows for the automated updating of tags across subscriptions, resource groups, and individual resources. It provides a convenient and time-saving solution for large-scale Azure resource management.
 
-The `Main` method is the entry point of the program, initializing an Azure Resource Manager (ARM) client with the default Azure credentials. The credentials are used to authenticate the user, and the ARM client is used to interact with Azure resources.
+## Features
 
-Here's a brief walkthrough of the code:
+- Target specific Azure tenants and subscriptions for tag updates.
+- Batch update tags on subscriptions, resource groups, and resources within these groups.
+- Use an editable dictionary of targeted keys to specify which tags require transformation.
+- Performance tracking via stopwatch functionality, with detailed console logging for transparency and troubleshooting.
 
-## Accessing Subscriptions
+## How it works
 
-The program retrieves all the subscriptions that the authenticated user has access to by calling `azure.GetSubscriptions()`. It then loops through each subscription. If the subscription matches a target tenant or subscription defined in the code, the program updates its tags and the tags of its resource groups.
+The utility uses Azure's ARM client to gather all subscriptions associated with a user's authentication. The utility then iterates over each subscription, updating tags on the subscription itself, and subsequently on its resource groups and the resources within those groups. 
+
+Specific tags targeted for update are defined in the dictionary `tagKeysNeedingUpdated`. For each target tag key, the utility updates the key while retaining the original value. 
+
+For example, if you want to rename the tag key "Client" to "Customer" across all selected Azure resources while maintaining the same values, this utility will handle that task efficiently.
+
+## Usage
+
+1. Configure `targetTenant`, `targetSubscription`, and `targetResourceGroup` in the main method. These are used to specify the scope of the tag updates. 
+2. Define the tags you want to update in the `tagKeysNeedingUpdated` dictionary. The key is the current tag, and the value is the new tag name.
+3. Run the application. It will iterate over all subscriptions, resource groups, and resources as per the scope specified, updating the tags as per the `tagKeysNeedingUpdated` dictionary.
+
+The console will display real-time updates about the subscription, resource group, and resource tags being updated. For each subscription, the utility logs the time taken to complete the updates, providing valuable insight into performance. 
+
+## Important Notes
+
+Please ensure that the Azure user has sufficient privileges to update the tags on the resources.
+
+This utility is designed for simplicity and ease of use, and it provides an effective solution for basic Azure tag management. However, for complex tag management scenarios, more advanced solutions may be required.
+
+This tool assumes that the subscriptions, resource groups, and resources requiring updates are independent of each other, and does not account for dependencies or conflicts that may arise due to tag updates.
+
+As this utility makes several requests to the Azure API, please be mindful of potential rate limiting issues. It is recommended to test the tool with a smaller scope before deploying it at scale.
+
+## Code Example
 
 ```csharp
+var tagKeysNeedingUpdated = new Dictionary<string, string>()
+{
+    { "Client", "Customer" },
+    { "Application", "Project" },
+    { "App", "Project" }
+};
+
 foreach (var sub in azure.GetSubscriptions())
 {
+    Stopwatch stopWatch = new Stopwatch();
+    stopWatch.Start();
+
     SubscriptionData? subscription = sub.Data;
     if (subscription.TenantId.ToString() != targetTenant) continue;
     if (!String.IsNullOrEmpty(targetSubscription) && subscription.SubscriptionId != targetSubscription) continue;
-    Console.WriteLine($"Updating: {subscription.DisplayName}");
-    Console.WriteLine($"Id: {subscription.SubscriptionId}");
+
     await UpdateSubscriptionTags(sub);
     await UpdateResourceGroupsTags(sub);
+
+    stopWatch.Stop();
+    TimeSpan ts = stopWatch.Elapsed;
+
+    Console.WriteLine($"Finished updating {subscription.DisplayName} ({subscription.SubscriptionId}) in {ts.TotalSeconds} seconds.");
 }
 ```
 
-## Updating Subscription Tags
+---
 
-The `UpdateSubscriptionTags` method is responsible for updating the tags of a given subscription. It retrieves the current tags of the subscription, determines which tags need to be updated, and applies the updates. The updated tags, along with the original tags that weren't updated, are then passed to the subscription's `CreateOrUpdateAsync` method to update the subscription's tags in Azure.
-
-For more information, you can refer to the [Azure Resource Manager SDK](https://docs.microsoft.com/en-us/dotnet/api/overview/azure/resources?view=azure-dotnet-3.1).
-
-## Updating Resource Groups Tags
-
-The `UpdateResourceGroupsTags` method updates the tags of a given subscription's resource groups. It retrieves the resource groups of the subscription, determines which tags need to be updated, and applies the updates. The updated tags, along with the original tags that weren't updated, are then passed to the resource group's `SetTagsAsync` method to update the resource group's tags in Azure.
-
-## Updating Resource Tags
-
-The `UpdateResourceTags` method updates the tags of the resources in a given resource group. It retrieves the resources of the resource group, determines which tags need to be updated, and applies the updates. The updated tags, along with the original tags that weren't updated, are then passed to the resource's `SetTagsAsync` method to update the resource's tags in Azure.
-
-## Getting Access Token
-
-The `GetAccessTokenAsync` method is used to retrieve an access token for authentication purposes. The token is necessary for authorizing HTTP requests made to Azure.
-
-The program also defines classes (`ResourceGroup` and `Properties`) to represent resource groups and their properties for JSON deserialization.
-
-For more information about working with Azure resources, you can refer to [Microsoft Azure Resource Manager client library for .NET](https://www.nuget.org/packages/Azure.ResourceManager/). For more about Azure authentication, you can refer to [Authenticate with the Azure libraries](https://docs.microsoft.com/en-us/dotnet/azure/authentication?view=azure-dotnet).
+This utility represents a simple, yet powerful, tool for managing tags across Azure resources. It helps maintain consistency and uniformity, leading to better organization and tracking of resources. We hope this utility proves useful in your Azure resource management efforts.
