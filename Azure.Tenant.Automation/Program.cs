@@ -169,7 +169,7 @@ internal class Program
             }
             else
             {
-                Console.WriteLine($"No tags marked for update in item {itemName}. Ensure the tags to be updated are properly identified.");
+                Console.WriteLine($"No tags requiring updating on {itemName}.");
             }
 
 
