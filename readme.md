@@ -45,4 +45,4 @@ The `GetAccessTokenAsync` method is used to retrieve an access token for authent
 
 The program also defines classes (`ResourceGroup` and `Properties`) to represent resource groups and their properties for JSON deserialization.
 
-For more information about working with Azure resources, you can refer to [Azure Management Libraries for .NET](https://docs.microsoft.com/en-us/dotnet/api/overview/azure/management?view=azure-dotnet). For more about Azure authentication, you can refer to [Authenticate with the Azure libraries](https://docs.microsoft.com/en-us/dotnet/azure/authentication?view=azure-dotnet).
+For more information about working with Azure resources, you can refer to [Microsoft Azure Resource Manager client library for .NET](https://www.nuget.org/packages/Azure.ResourceManager/). For more about Azure authentication, you can refer to [Authenticate with the Azure libraries](https://docs.microsoft.com/en-us/dotnet/azure/authentication?view=azure-dotnet).
