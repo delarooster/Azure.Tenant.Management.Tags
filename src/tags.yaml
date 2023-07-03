@@ -1,0 +1,6 @@
+# key is the tag we're targeting for update (existing tag key)
+# value of key is the intended new key to replace existing tag key
+# e.g. We want to update any existing tags with the name of "Client" to "Customer", while retaining same value
+Client: Customer
+Application: Project
+App: Project

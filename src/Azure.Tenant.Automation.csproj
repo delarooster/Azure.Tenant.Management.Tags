@@ -14,6 +14,7 @@
     <PackageReference Include="Azure.ResourceManager.Network" Version="1.3.0" />
     <PackageReference Include="Azure.Identity" Version="1.9.0" />
     <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="YamlDotNet" Version="13.1.1" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="tests\obj\tests.csproj.nuget.dgspec.json" />
@@ -25,4 +26,9 @@
     <Compile Remove="tests\TagUpdateTests.cs" />
     <Compile Remove="tests\Usings.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="tags.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+</ItemGroup>
 </Project>
