@@ -71,4 +71,4 @@ foreach (var sub in azure.GetSubscriptions())
 This utility represents a simple, yet powerful, tool for managing tags across Azure resources. It helps maintain consistency and uniformity, leading to better organization and tracking of resources. We hope this utility proves useful in your Azure resource management efforts.
 
 ## Repository Visualizer
-![Visualization of the codebase](./diagram.svg)
+![Visualization of the codebase](./images/diagram.svg)
