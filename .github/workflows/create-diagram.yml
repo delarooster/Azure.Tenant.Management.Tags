@@ -1,6 +1,10 @@
 name: Create Diagram
 run-name: Create Repo Image Visualizer 🚀
-on: [push]
+on: 
+  push:
+    branches:
+      - develop
+      - master
 jobs:
   Create-Diagram:
     runs-on: ubuntu-latest
