@@ -40,7 +40,7 @@ As this utility makes several requests to the Azure API, please be mindful of po
 ## Code Example
 
 ```csharp
-var tagKeysNeedingUpdated = new Dictionary<string, string>()
+private readonly Dictionary<string, string> tagKeysNeedingUpdated = new()
 {
     { "Client", "Customer" },
     { "Application", "Project" },
