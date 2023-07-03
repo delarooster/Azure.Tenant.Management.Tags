@@ -3,17 +3,21 @@ using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
 using Azure.ResourceManager.Resources.Models;
+using YamlDotNet.Serialization;
+using System.IO;
 
 namespace Azure.Tenant.Automation
 {
     public class Program
     {
-        private readonly Dictionary<string, string> _tagKeysNeedingUpdated = new()
+        private readonly Dictionary<string, string> _tagKeysNeedingUpdated;
+
+        public Program()
         {
-            { "Client", "Customer" },
-            { "Application", "Project" },
-            { "App", "Project" }
-        };
+            var deserializer = new DeserializerBuilder().Build();
+            var yamlString = File.ReadAllText("tags.yaml");
+            _tagKeysNeedingUpdated = deserializer.Deserialize<Dictionary<string, string>>(yamlString);
+        }
 
         public static async Task Main()
         {
