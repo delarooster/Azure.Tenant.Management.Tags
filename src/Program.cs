@@ -62,7 +62,7 @@ namespace Azure.Tenant.Automation
 
                 if (subscriptionTags?.Count > 0)
                 {
-                    var updatedTags = _program.UpdateTags(subscriptionTags, subscription.Data.DisplayName);
+                    var updatedTags = _program.UpdateTags(subscriptionTags, subscription.Data.DisplayName, "subscription");
 
                     // Construct the TagResourceData object required to pass to subscription tag update
                     Tag tag = new();
@@ -91,7 +91,7 @@ namespace Azure.Tenant.Automation
 
                     if (resourceGroupTags?.Count > 0)
                     {
-                        var updatedTags = _program.UpdateTags(resourceGroupTags, resourceGroupName);
+                        var updatedTags = _program.UpdateTags(resourceGroupTags, resourceGroupName, "resource group");
                         await resourceGroup.SetTagsAsync(updatedTags);
                     }
                     else
@@ -112,22 +112,31 @@ namespace Azure.Tenant.Automation
                     {
                         var resourceTags = resource?.Data?.Tags;
                         var resourceName = resource?.Data?.Name;
+                        var resourceType = resource?.Data?.ResourceType;
 
                         if (resourceTags?.Count > 0)
                         {
-                            var updatedTags = _program.UpdateTags(resourceTags, resourceName);
-                            await resource.SetTagsAsync(updatedTags);
+                            try
+                            {
+                                var updatedTags = _program.UpdateTags(resourceTags, resourceName, resourceType);
+                                await resource.SetTagsAsync(updatedTags);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"An error occurred while setting tags for the resource {resourceType} with name {resourceName}: {ex.Message}");
+                            }
                         }
                         else
                         {
                             Console.WriteLine($"No tags on resource {resourceName}");
                         }
+
                     }
                 }
             }
         }
 
-        public Dictionary<string, string> UpdateTags(IDictionary<string, string> currentTags, string itemName)
+        public Dictionary<string, string> UpdateTags(IDictionary<string, string> currentTags, string itemName, string resourceType = "")
         {
             var originalTags = new Dictionary<string, string>(currentTags);
             Dictionary<string, string> tagsToApply = new();
@@ -141,7 +150,8 @@ namespace Azure.Tenant.Automation
                 tagsToApply = markedTagsForUpdate.ToDictionary(x => x.Key, x => x.Value);
                 markedTagsForUpdate.ForEach(tag =>
                 {
-                    Console.WriteLine($"Changing tag {tag.Key} to {_tagKeysNeedingUpdated[tag.Key]} for item {itemName}");
+                    string resourceMessage = !String.IsNullOrEmpty(resourceType) ? $"{resourceType}:" : "item:";
+                    Console.WriteLine($"Changing tag {tag.Key} to {_tagKeysNeedingUpdated[tag.Key]} for {resourceMessage} {itemName}");
                     // Add new tag key, retaining existing value
                     tagsToApply[_tagKeysNeedingUpdated[tag.Key]] = tag.Value;
                     // Remove old tag from both dictionaries
