@@ -23,36 +23,51 @@ namespace Azure.Tenant.Automation
         {
             ArmClient azure = new(new DefaultAzureCredential());
             const string _targetTenant = "d49110b2-6f26-4c66-b723-1729cdb9a3cf";
-            const string _targetSubscription = "cb70135b-a87f-47c4-adc2-9e172bc22f88";
-            const string _targetResourceGroup = "rg-devops-dv";
+            const string _targetSubscription = "";
+            const string _targetResourceGroup = "";
             Program _program = new Program();
 
-            foreach (var sub in azure.GetSubscriptions())
+            var subscriptions = azure.GetSubscriptions().ToList();
+            var tasks = subscriptions.Select(async sub =>
             {
-                Stopwatch stopWatch = new Stopwatch();
-                stopWatch.Start();
-
-                SubscriptionData? subscription = sub.Data;
-                if (subscription.TenantId.ToString() != _targetTenant)
+                try
                 {
-                    Console.WriteLine($"Skipping {subscription.DisplayName} - not target tenant.");
-                    continue;
+                    Stopwatch stopWatch = new Stopwatch();
+                    stopWatch.Start();
+
+                    SubscriptionData? subscription = sub.Data;
+                    if(subscription.State.ToString() != "Enabled")
+                    {
+                        Console.WriteLine($"Not Enabled: subscription {subscription.DisplayName}, skipping...");
+                    }
+                    if (subscription.TenantId.ToString() != _targetTenant)
+                    {
+                        Console.WriteLine($"Outside target tenant: subscription {subscription.DisplayName}, skipping...");
+                        return;
+                    }
+                    if (!String.IsNullOrEmpty(_targetSubscription) && subscription.SubscriptionId != _targetSubscription)
+                    {
+                        Console.WriteLine($"Skipping {subscription.DisplayName} - not target subscription.");
+                        return;
+                    }
+
+                    Console.WriteLine($"Start updating {subscription.DisplayName} ({subscription.SubscriptionId})...");
+                    await UpdateSubscriptionTags(sub);
+                    await UpdateResourceGroupsTags(sub);
+
+                    stopWatch.Stop();
+                    TimeSpan ts = stopWatch.Elapsed;
+
+                    Console.WriteLine($"Finished updating {subscription.DisplayName} ({subscription.SubscriptionId}) in {ts.TotalSeconds} seconds.");
                 }
-                if (!String.IsNullOrEmpty(_targetSubscription) && subscription.SubscriptionId != _targetSubscription)
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"Skipping {subscription.DisplayName} - not target subscription.");
-                    continue;
+                    // Log the error or handle it in any other way
+                    Console.WriteLine($"An error occurred while updating the subscription {sub.Data.DisplayName}: {ex.Message}");
                 }
+            });
 
-                Console.WriteLine($"Start updating {subscription.DisplayName} ({subscription.SubscriptionId})...");
-                await UpdateSubscriptionTags(sub);
-                await UpdateResourceGroupsTags(sub);
-
-                stopWatch.Stop();
-                TimeSpan ts = stopWatch.Elapsed;
-
-                Console.WriteLine($"Finished updating {subscription.DisplayName} ({subscription.SubscriptionId}) in {ts.TotalSeconds} seconds.");
-            }
+            await Task.WhenAll(tasks);
 
 
 
