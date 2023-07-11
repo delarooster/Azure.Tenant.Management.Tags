@@ -1,8 +1,7 @@
 
 using Azure.Tenant.Automation;
-using Xunit;
 
-namespace Tests;
+namespace Azure.Tenant.Automation.Tests;
 
 public class TagUpdateTests
 {

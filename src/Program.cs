@@ -97,24 +97,50 @@ namespace Azure.Tenant.Automation
 
             async Task UpdateResourceGroupsTags(SubscriptionResource subscription)
             {
-                foreach (ResourceGroupResource resourceGroup in subscription.GetResourceGroups())
+                try
                 {
-                    string resourceGroupName = resourceGroup.Data.Name;
-                    if (!String.IsNullOrEmpty(_targetResourceGroup) && resourceGroupName != _targetResourceGroup) continue;
-
-                    var resourceGroupTags = resourceGroup?.Data?.Tags;
-
-                    if (resourceGroupTags?.Count > 0)
+                    Parallel.ForEach(subscription.GetResourceGroups(), resourceGroup =>
                     {
-                        var updatedTags = _program.UpdateTags(resourceGroupTags, resourceGroupName, "resource group");
-                        await resourceGroup.SetTagsAsync(updatedTags);
-                    }
-                    else
-                    {
-                        Console.WriteLine($"No tags on resource {resourceGroupName}");
-                    }
-                    await UpdateResourcesTags(subscription, resourceGroup);
+                        string resourceGroupName = resourceGroup.Data.Name;
+                        if (!String.IsNullOrEmpty(_targetResourceGroup) && resourceGroupName != _targetResourceGroup) return;
+
+                        var resourceGroupTags = resourceGroup?.Data?.Tags;
+
+                        if (resourceGroupTags?.Count > 0)
+                        {
+                            try
+                            {
+                                var updatedTags = _program.UpdateTags(resourceGroupTags, resourceGroupName, "resource group");
+                                resourceGroup.SetTagsAsync(updatedTags).Wait();
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error updating tags for resource group {resourceGroupName}: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"No tags on resource {resourceGroupName}");
+                        }
+
+                        try
+                        {
+                            UpdateResourcesTags(subscription, resourceGroup).Wait();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error updating tags for resources in resource group {resourceGroupName}: {ex.Message}");
+                        }
+                    });
                 }
+                catch (AggregateException ex)
+                {
+                    foreach (var innerEx in ex.InnerExceptions)
+                    {
+                        Console.WriteLine($"Error processing one or more resource groups: {innerEx.Message}");
+                    }
+                }
+
             }
 
             async Task UpdateResourcesTags(SubscriptionResource subscription, ResourceGroupResource resourceGroup)
@@ -123,32 +149,42 @@ namespace Azure.Tenant.Automation
 
                 if (resources != null)
                 {
-                    foreach (var resource in resources)
+                    try
                     {
-                        var resourceTags = resource?.Data?.Tags;
-                        var resourceName = resource?.Data?.Name;
-                        var resourceType = resource?.Data?.ResourceType;
-
-                        if (resourceTags?.Count > 0)
+                        Parallel.ForEach(resources, resource =>
                         {
-                            try
-                            {
-                                var updatedTags = _program.UpdateTags(resourceTags, resourceName, resourceType);
-                                await resource.SetTagsAsync(updatedTags);
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"An error occurred while setting tags for the resource {resourceType} with name {resourceName}: {ex.Message}");
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine($"No tags on resource {resourceName}");
-                        }
+                            var resourceTags = resource?.Data?.Tags;
+                            var resourceName = resource?.Data?.Name;
+                            var resourceType = resource?.Data?.ResourceType;
 
+                            if (resourceTags?.Count > 0)
+                            {
+                                try
+                                {
+                                    var updatedTags = _program.UpdateTags(resourceTags, resourceName, resourceType);
+                                    resource.SetTagsAsync(updatedTags).Wait();
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"An error occurred while setting tags for the resource {resourceType} with name {resourceName}: {ex.Message}");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"No tags on resource {resourceName}");
+                            }
+                        });
+                    }
+                    catch (AggregateException ex)
+                    {
+                        foreach (var innerEx in ex.InnerExceptions)
+                        {
+                            Console.WriteLine($"Error processing one or more resources: {innerEx.Message}");
+                        }
                     }
                 }
             }
+
         }
 
         public Dictionary<string, string> UpdateTags(IDictionary<string, string> currentTags, string itemName, string resourceType = "")
