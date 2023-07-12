@@ -1,11 +1,18 @@
 
 using Azure.Tenant.Automation;
-using Xunit;
+using Microsoft.VisualStudio.TestPlatform.TestHost;
 
-namespace Tests;
+namespace Azure.Tenant.Automation.Tests;
 
 public class TagUpdateTests
 {
+    Program _program;
+
+    public TagUpdateTests()
+    {
+        _program = new();
+    }
+
     [Fact]
     public void HappyPath()
     {
@@ -17,11 +24,9 @@ public class TagUpdateTests
             {"Environment", "Dv"},
             {"foo", "sub"}
         };
-
         var itemName = "storageAccount";
 
-        Program program = new Program();
-        var updatedTags = program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTags(originalTags, itemName);
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -45,8 +50,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        Program program = new Program();
-        var updatedTags = program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTags(originalTags, itemName);
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -68,8 +72,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        Program program = new Program();
-        var updatedTags = program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTags(originalTags, itemName);
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -94,8 +97,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        Program program = new Program();
-        var updatedTags = program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTags(originalTags, itemName);
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -118,8 +120,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        Program program = new Program();
-        var updatedTags = program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTags(originalTags, itemName);
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -139,8 +140,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        Program program = new Program();
-        var updatedTags = program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTags(originalTags, itemName);
 
         // Assert
         var expectedTags = new Dictionary<string, string> { };
@@ -158,8 +158,7 @@ public class TagUpdateTests
 
         var itemName = "Dv-AD-Sdbx";
 
-        Program program = new Program();
-        var updatedTags = program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTags(originalTags, itemName);
 
         // Assert
         var expectedTags = new Dictionary<string, string>
