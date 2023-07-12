@@ -25,14 +25,14 @@ namespace Azure.Tenant.Automation
             const string _targetTenant = "d49110b2-6f26-4c66-b723-1729cdb9a3cf";
             const string _targetSubscription = "";
             const string _targetResourceGroup = "";
-            Program _program = new Program();
+            Program _program = new();
 
             var subscriptions = azure.GetSubscriptions().ToList();
             var tasks = subscriptions.Select(async sub =>
             {
                 try
                 {
-                    Stopwatch stopWatch = new Stopwatch();
+                    Stopwatch stopWatch = new();
                     stopWatch.Start();
 
                     SubscriptionData? subscription = sub.Data;
@@ -84,7 +84,7 @@ namespace Azure.Tenant.Automation
                     foreach (var updatedTag in updatedTags)
                     {
                         tag.TagValues.Add(updatedTag.Key, updatedTag.Value);
-                    };
+                    }
                     TagResourceData tags = new(tag);
                     const Azure.WaitUntil wait = new();
                     await subscription.GetTagResource().CreateOrUpdateAsync(wait, tags);
@@ -125,7 +125,7 @@ namespace Azure.Tenant.Automation
 
                         try
                         {
-                            UpdateResourcesTags(subscription, resourceGroup).Wait();
+                            UpdateResourcesTags(resourceGroup).Wait();
                         }
                         catch (Exception ex)
                         {
@@ -143,7 +143,7 @@ namespace Azure.Tenant.Automation
 
             }
 
-            async Task UpdateResourcesTags(SubscriptionResource subscription, ResourceGroupResource resourceGroup)
+            async Task UpdateResourcesTags(ResourceGroupResource resourceGroup)
             {
                 var resources = resourceGroup.GetGenericResources();
 
@@ -184,7 +184,6 @@ namespace Azure.Tenant.Automation
                     }
                 }
             }
-
         }
 
         public Dictionary<string, string> UpdateTags(IDictionary<string, string> currentTags, string itemName, string resourceType = "")
