@@ -3,15 +3,17 @@ run-name: Create Repo Image Visualizer 🚀
 on: 
   push:
     branches:
-      - feature*
+      - feature/*
       - develop
       - master
 jobs:
   Create-Diagram:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - name: Checkout code
       uses: actions/checkout@master
+    - name: Branch name
+      run: echo running on branch ${GITHUB_REF##*/}
     - name: Update diagram
       uses: githubocto/repo-visualizer@0.7.1
       with:
