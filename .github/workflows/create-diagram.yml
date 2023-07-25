@@ -3,6 +3,7 @@ run-name: Create Repo Image Visualizer 🚀
 on: 
   push:
     branches:
+      - feature*
       - develop
       - master
 jobs:
