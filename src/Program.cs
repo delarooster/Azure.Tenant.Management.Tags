@@ -201,57 +201,47 @@ namespace Azure.Tenant.Automation
 
         public Dictionary<string, string> UpdateTagKeys(AzureResource resources)
         {
-            var originalTags = new Dictionary<string, string>(resources.CurrentTags);
-            Dictionary<string, string> tagsToApply = new();
+            // Clone the original tags to results
+            Dictionary<string, string> results = new Dictionary<string, string>(resources.CurrentTags);
 
-            var markedTagsForUpdate = resources.CurrentTags
-                    .Where(tag => _tagKeysToUpdate.ContainsKey(tag.Key))
-                    .ToList();
+            var keysForUpdate = resources.CurrentTags
+                .Where(tag => _tagKeysToUpdate.ContainsKey(tag.Key))
+                .ToList();
 
-            if (markedTagsForUpdate.Any())
+            if (keysForUpdate.Any())
             {
-                foreach (var tag in markedTagsForUpdate)
+                foreach (var tag in keysForUpdate)
                 {
-                    string resourceMessage = !String.IsNullOrEmpty(resources.ResourceType) ? $"{resources.ResourceType}:" : "item:";
+                    string resourceMessage = !String.IsNullOrEmpty(resources.ResourceType)
+                        ? $"{resources.ResourceType}:"
+                        : "item:";
 
                     Console.WriteLine($"Changing tag key {tag.Key} to {_tagKeysToUpdate[tag.Key]} for {resourceMessage} {resources.ItemName}");
 
-                    // Add new key with the original value
-                    originalTags[_tagKeysToUpdate[tag.Key]] = tag.Value;
-
-                    // Remove the old key
-                    originalTags.Remove(tag.Key);
+                    // Check if the new key doesn't already exist
+                    if (!results.ContainsKey(_tagKeysToUpdate[tag.Key]))
+                    {
+                        // Add new key with the original value
+                        results[_tagKeysToUpdate[tag.Key]] = tag.Value;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Warning: Key {_tagKeysToUpdate[tag.Key]} already exists. Skipping update for {tag.Key}.");
+                    }
                 }
 
-                resources.CurrentTags.Clear();
-                foreach (var tag in originalTags)
+                // Now, remove the old keys. Doing this in a separate loop ensures that we don't accidentally remove keys before their values are transferred.
+                foreach (var tag in keysForUpdate)
                 {
-                    resources.CurrentTags[tag.Key] = tag.Value;
+                    results.Remove(tag.Key);
                 }
-
             }
             else
             {
                 Console.WriteLine($"No tag keys requiring updating on {resources.ItemName}.");
             }
 
-            if (tagsToApply.Count > 0 || originalTags.Count > 0)
-            {
-                // Recombine existing tags with updated tags
-                foreach (var tag in originalTags)
-                {
-                    if (!tagsToApply.ContainsKey(tag.Key))
-                    {
-                        tagsToApply.Add(tag.Key, tag.Value);
-                    }
-                }
-            }
-            else
-            {
-                Console.WriteLine($"No updated tag keys to recombine for item {resources.ItemName}. Check if the tags were properly updated.");
-            }
-
-            return tagsToApply;
+            return results;
         }
 
         public Dictionary<string, string> UpdateTagValues(AzureResource resources)
