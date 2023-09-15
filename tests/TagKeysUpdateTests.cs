@@ -4,11 +4,11 @@ using Microsoft.VisualStudio.TestPlatform.TestHost;
 
 namespace Azure.Tenant.Automation.Tests;
 
-public class TagUpdateTests
+public class TagKeysUpdateTests
 {
     Program _program;
 
-    public TagUpdateTests()
+    public TagKeysUpdateTests()
     {
         _program = new();
     }
@@ -26,7 +26,7 @@ public class TagUpdateTests
         };
         var itemName = "storageAccount";
 
-        var updatedTags = _program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -50,7 +50,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        var updatedTags = _program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -72,7 +72,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        var updatedTags = _program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -97,7 +97,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        var updatedTags = _program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -120,7 +120,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        var updatedTags = _program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
 
         // Assert
         var expectedTags = new Dictionary<string, string>
@@ -140,7 +140,7 @@ public class TagUpdateTests
 
         var itemName = "storageAccount";
 
-        var updatedTags = _program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
 
         // Assert
         var expectedTags = new Dictionary<string, string> { };
@@ -158,7 +158,7 @@ public class TagUpdateTests
 
         var itemName = "Dv-AD-Sdbx";
 
-        var updatedTags = _program.UpdateTags(originalTags, itemName);
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
 
         // Assert
         var expectedTags = new Dictionary<string, string>

@@ -30,5 +30,8 @@
     <None Update="tags.yaml">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="values.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
 </ItemGroup>
 </Project>
