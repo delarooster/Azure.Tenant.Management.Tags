@@ -256,14 +256,14 @@ namespace Azure.Tenant.Automation
 
         public Dictionary<string, string> UpdateTagValues(AzureResource resources)
         {
-            var originalTags = new Dictionary<string, string>(resources.CurrentTags);
-            IDictionary<string, string> results;
+            // Clone the original tags to results
+            Dictionary<string, string> results = new Dictionary<string, string>(resources.CurrentTags);
 
             var valuesForUpdate = resources.CurrentTags
-                    .Where(tag => _tagValuesToUpdate.ContainsKey(tag.Value))
-                    .ToList();
+                .Where(tag => _tagValuesToUpdate.ContainsKey(tag.Value))
+                .ToList();
 
-            if (valuesForUpdate.Any()) // You can use Any() here, it's more idiomatic
+            if (valuesForUpdate.Any())
             {
                 foreach (var tag in valuesForUpdate)
                 {
@@ -273,30 +273,13 @@ namespace Azure.Tenant.Automation
 
                     Console.WriteLine($"Changing tag value {tag.Value} to {_tagValuesToUpdate[tag.Value]} for tag {tag.Key} on {resourceMessage} {resources.ItemName}");
 
-                    // Update the value for the key directly in the dictionary
-                    resources.CurrentTags[tag.Key] = _tagValuesToUpdate[tag.Value];
-                    results = resources.CurrentTags;
+                    // Update the value for the key directly in the results dictionary
+                    results[tag.Key] = _tagValuesToUpdate[tag.Value];
                 }
             }
             else
-                    {
+            {
                 Console.WriteLine($"No tag values requiring updating on {resources.ItemName}.");
-            }
-
-            if (results.Count > 0 || originalTags.Count > 0)
-            {
-                // Recombine existing tags with updated tags
-                foreach (var tag in originalTags)
-                {
-                    if (!results.ContainsKey(tag.Key))
-                    {
-                        results.Add(tag.Key, tag.Value);
-                    }
-                }
-            }
-            else
-            {
-                Console.WriteLine($"No updated tag values to recombine for item {resources.ItemName}. Check if the tags were properly updated.");
             }
 
             return results;
