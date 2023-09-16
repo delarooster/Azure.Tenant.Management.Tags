@@ -1,1 +1,5 @@
-﻿Internal: Mesh
+﻿# the key of the dictionary is the tag value we're intending to update
+# e.g. if we want to update "Internal" to "Mesh", we would use the key "Internal"
+# and the value "Mesh", as below
+# resulting tag: "Customer: Internal" -> "Customer: Mesh"
+Internal: Mesh
