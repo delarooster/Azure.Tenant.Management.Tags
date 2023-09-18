@@ -34,6 +34,33 @@ namespace Azure.Tenant.Automation.Tests
 
             Assert.Equal(expectedTags, updatedTags);
         }
+
+        [Fact]
+        public void NoChange()
+        {
+            // Arrange
+            var originalTags = new Dictionary<string, string>
+        {
+            {"Customer", "Mesh"},
+            {"Project", "Mesh"},
+            {"Environment", "Sd"},
+            {"foo", "sub"}
+        };
+            var itemName = "storageAccount";
+
+            var updatedTags = _program.UpdateTagValues(new AzureResource(originalTags, itemName));
+
+            // Assert
+            var expectedTags = new Dictionary<string, string>
+        {
+            {"Customer", "Mesh"},
+            {"Project", "Mesh"},
+            {"Environment", "Sd"},
+            {"foo", "sub"}
+        };
+
+            Assert.Equal(expectedTags, updatedTags);
+        }
     }
 }
 

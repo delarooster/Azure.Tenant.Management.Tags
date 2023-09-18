@@ -26,8 +26,8 @@ namespace Azure.Tenant.Automation
         {
             ArmClient azure = new(new DefaultAzureCredential());
             const string _targetTenant = "d49110b2-6f26-4c66-b723-1729cdb9a3cf";
-            const string _targetSubscription = "cb70135b-a87f-47c4-adc2-9e172bc22f88"; // Dv-AD-Sdbx
-            const string _targetResourceGroup = "rg-devops-dv";
+            const string _targetSubscription = "";
+            const string _targetResourceGroup = "";
             Program _program = new();
 
             var subscriptions = azure.GetSubscriptions().ToList();
@@ -78,12 +78,11 @@ namespace Azure.Tenant.Automation
             {
                 Dictionary<string, string> subscriptionTags = new Dictionary<string, string>(subscription.Data.Tags);
 
-                if (subscriptionTags?.Count > 0)
+                if (subscriptionTags.Any())
                 {
-                    var currentResourceState = new AzureResource(subscriptionTags, subscription.Data.DisplayName, "subscription");
-                    var updatedTagKeys = _program.UpdateTagKeys(currentResourceState);
-                    var updatedResourceTags = new AzureResource(updatedTagKeys, subscription.Data.DisplayName, "subscription");
-                    var updatedTags = _program.UpdateTagValues(updatedResourceTags);
+                    var updatedTags = _program
+                        .UpdateTagKeys(CreateAzureResource(subscriptionTags, subscription.Data.DisplayName, "subscription"))
+                        .Pipe(tags => _program.UpdateTagValues(CreateAzureResource(tags, subscription.Data.DisplayName, "subscription")));
 
                     // Construct the TagResourceData object required to pass to subscription tag update
                     Tag tag = new();
@@ -112,14 +111,14 @@ namespace Azure.Tenant.Automation
 
                         var resourceGroupTags = resourceGroup?.Data?.Tags;
 
-                        if (resourceGroupTags?.Count > 0)
+                        if (resourceGroupTags.Any())
                         {
                             try
                             {
-                                var currentResourceState = new AzureResource(resourceGroupTags, resourceGroupName, "resource group");
-                                var updatedTagKeys = _program.UpdateTagKeys(currentResourceState);
-                                var updatedResourceTags = new AzureResource(updatedTagKeys, resourceGroupName, "resource group");
-                                var updatedTags = _program.UpdateTagValues(updatedResourceTags);
+                                var updatedTags = _program
+                                    .UpdateTagKeys(CreateAzureResource(resourceGroupTags, resourceGroupName, "resource group"))
+                                    .Pipe(tags => _program.UpdateTagValues(CreateAzureResource(tags, resourceGroupName, "resource group")));
+
                                 resourceGroup.SetTagsAsync(updatedTags).Wait();
                             }
                             catch (Exception ex)
@@ -166,16 +165,15 @@ namespace Azure.Tenant.Automation
                             var resourceName = resource?.Data?.Name;
                             var resourceType = resource?.Data?.ResourceType;
 
-                            if (resourceTags?.Count > 0)
+                            if (resourceTags != null && resourceTags.Any())
                             {
                                 try
                                 {
-                                    var currentResourceState = new AzureResource(resourceTags, resourceName, resourceType);
-                                    var updatedTagKeys = _program.UpdateTagKeys(currentResourceState);
-                                    var updatedResourceTags = new AzureResource(updatedTagKeys, resourceName, resourceType);
-                                    var updatedTags = _program.UpdateTagValues(updatedResourceTags);
+                                  var updatedTags = _program
+                                    .UpdateTagKeys(CreateAzureResource(resourceTags, resourceName, resourceType))
+                                    .Pipe(tags => _program.UpdateTagValues(CreateAzureResource(tags, resourceName, resourceType)));
 
-                                    resource.SetTagsAsync(updatedTags).Wait();
+                                  resource?.SetTagsAsync(updatedTags).Wait();
                                 }
                                 catch (Exception ex)
                                 {
@@ -197,9 +195,12 @@ namespace Azure.Tenant.Automation
                     }
                 }
             }
+
+            AzureResource CreateAzureResource(IDictionary<string, string> tags, string name, string type) => new AzureResource(tags, name, type);
+            
         }
 
-        public Dictionary<string, string> UpdateTagKeys(AzureResource resources)
+        public IDictionary<string, string> UpdateTagKeys(AzureResource resources)
         {
             // Clone the original tags to results
             Dictionary<string, string> results = new Dictionary<string, string>(resources.CurrentTags);
@@ -244,7 +245,7 @@ namespace Azure.Tenant.Automation
             return results;
         }
 
-        public Dictionary<string, string> UpdateTagValues(AzureResource resources)
+        public IDictionary<string, string> UpdateTagValues(AzureResource resources)
         {
             // Clone the original tags to results
             Dictionary<string, string> results = new Dictionary<string, string>(resources.CurrentTags);
@@ -277,7 +278,6 @@ namespace Azure.Tenant.Automation
     }
     public struct AzureResource
     {
-
         public AzureResource(IDictionary<string, string> currentTags, string itemName, string resourceType = "")
         {
             CurrentTags = currentTags;
@@ -287,5 +287,11 @@ namespace Azure.Tenant.Automation
         public IDictionary<string, string> CurrentTags { get; }
         public string ItemName { get; }
         public string ResourceType { get; }
+    }
+
+    public static class FunctionalExtensions
+    {
+        public static TResult Pipe<T, TResult>(this T input, Func<T, TResult> func)
+            => func(input);
     }
 }
