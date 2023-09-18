@@ -26,7 +26,7 @@ namespace Azure.Tenant.Automation
         {
             ArmClient azure = new(new DefaultAzureCredential());
             const string _targetTenant = "d49110b2-6f26-4c66-b723-1729cdb9a3cf";
-            const string _targetSubscription = "cb70135b-a87f-47c4-adc2-9e172bc22f88"; // Dv-AD-Sdbx
+            const string _targetSubscription = "";
             const string _targetResourceGroup = "";
             Program _program = new();
 
