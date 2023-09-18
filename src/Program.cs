@@ -276,10 +276,8 @@ namespace Azure.Tenant.Automation
             return results;
         }
     }
-
     public struct AzureResource
     {
-
         public AzureResource(IDictionary<string, string> currentTags, string itemName, string resourceType = "")
         {
             CurrentTags = currentTags;
