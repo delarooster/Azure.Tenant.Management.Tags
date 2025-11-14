@@ -1,0 +1,31 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+
+# Test projects
+tests/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+images/
+
+# Solution files (not needed for Docker build)
+*.sln
+
+# Example config files (use actual config via environment variables in Docker)
+appsettings.example.json
+
+# IDE files
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+

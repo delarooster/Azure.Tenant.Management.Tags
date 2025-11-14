@@ -168,4 +168,80 @@ public class TagKeysUpdateTests
 
         Assert.Equal(expectedTags, updatedTags);
     }
+
+    [Fact]
+    public void NewKeyAlreadyExistsWithDifferentValue()
+    {
+        // If the new key already exists, the update should be skipped
+        // and the old key should still be removed (potential data loss scenario)
+        // Arrange
+        var originalTags = new Dictionary<string, string>
+        {
+            {"Client", "Contoso"},
+            {"Customer", "ExistingValue"} // New key already exists with different value
+        };
+
+        var itemName = "storageAccount";
+
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
+
+        // Assert
+        // The "Client" key should be removed, but "Customer" should keep its original value
+        var expectedTags = new Dictionary<string, string>
+        {
+            {"Customer", "ExistingValue"} // Original value preserved, "Client" removed
+        };
+
+        Assert.Equal(expectedTags, updatedTags);
+    }
+
+    [Fact]
+    public void NewKeyAlreadyExistsWithSameValue()
+    {
+        // If the new key already exists with the same value, the update should be skipped
+        // Arrange
+        var originalTags = new Dictionary<string, string>
+        {
+            {"Client", "Contoso"},
+            {"Customer", "Contoso"} // New key already exists with same value
+        };
+
+        var itemName = "storageAccount";
+
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
+
+        // Assert
+        // The "Client" key should be removed, "Customer" keeps its value
+        var expectedTags = new Dictionary<string, string>
+        {
+            {"Customer", "Contoso"}
+        };
+
+        Assert.Equal(expectedTags, updatedTags);
+    }
+
+    [Fact]
+    public void CaseSensitiveKeyTest()
+    {
+        // Tag keys are case-sensitive, so "client" should not match "Client"
+        // Arrange
+        var originalTags = new Dictionary<string, string>
+        {
+            {"client", "Contoso"}, // lowercase, should not be updated
+            {"Client", "Contoso"}  // uppercase, should be updated to "Customer"
+        };
+
+        var itemName = "storageAccount";
+
+        var updatedTags = _program.UpdateTagKeys(new AzureResource(originalTags, itemName));
+
+        // Assert
+        var expectedTags = new Dictionary<string, string>
+        {
+            {"client", "Contoso"}, // unchanged (case-sensitive)
+            {"Customer", "Contoso"} // updated from "Client"
+        };
+
+        Assert.Equal(expectedTags, updatedTags);
+    }
 }

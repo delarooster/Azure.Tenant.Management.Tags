@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Linq;
 using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Resources;
@@ -6,7 +7,7 @@ using Azure.ResourceManager.Resources.Models;
 using YamlDotNet.Serialization;
 using System.IO;
 using System.Collections.Generic;
-using System.Threading.Channels;
+using Microsoft.Extensions.Configuration;
 
 namespace Azure.Tenant.Automation
 {
@@ -24,24 +25,38 @@ namespace Azure.Tenant.Automation
 
         public static async Task Main()
         {
-            ArmClient azure = new(new DefaultAzureCredential());
-            const string _targetTenant = "d49110b2-6f26-4c66-b723-1729cdb9a3cf";
-            const string _targetSubscription = "";
-            const string _targetResourceGroup = "";
+            // Build configuration from appsettings.json and environment variables
+            // Environment variables take precedence (Docker-friendly)
+            // Environment variables use double underscore (__) for nested keys: Azure__TargetTenant
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
+                .Build();
+
+            // Get configuration values - environment variables override appsettings.json
+            var _targetTenant = configuration["Azure:TargetTenant"] 
+                ?? throw new InvalidOperationException("TargetTenant must be configured in appsettings.json or Azure__TargetTenant environment variable");
+            
+            var _targetSubscription = configuration["Azure:TargetSubscription"] ?? string.Empty;
+            var _targetResourceGroup = configuration["Azure:TargetResourceGroup"] ?? string.Empty;
+
             Program _program = new();
 
+            ArmClient azure = new(new DefaultAzureCredential());
             var subscriptions = azure.GetSubscriptions().ToList();
+            
             var tasks = subscriptions.Select(async sub =>
             {
                 try
                 {
-                    Stopwatch stopWatch = new();
-                    stopWatch.Start();
+                    Stopwatch stopWatch = Stopwatch.StartNew();
 
                     SubscriptionData? subscription = sub.Data;
                     if (subscription.State.ToString() != "Enabled")
                     {
                         Console.WriteLine($"Not Enabled: subscription {subscription.DisplayName}, skipping...");
+                        return;
                     }
                     if (subscription.TenantId.ToString() != _targetTenant)
                     {
@@ -55,17 +70,14 @@ namespace Azure.Tenant.Automation
                     }
 
                     Console.WriteLine($"Start updating {subscription.DisplayName} ({subscription.SubscriptionId})...");
-                    await UpdateSubscriptionTags(sub);
-                    await UpdateResourceGroupsTags(sub);
+                    await UpdateSubscriptionTags(sub, _program);
+                    await UpdateResourceGroupsTags(sub, _program, _targetResourceGroup);
 
                     stopWatch.Stop();
-                    TimeSpan ts = stopWatch.Elapsed;
-
-                    Console.WriteLine($"Finished updating {subscription.DisplayName} ({subscription.SubscriptionId}) in {ts.TotalSeconds} seconds.");
+                    Console.WriteLine($"Finished updating {subscription.DisplayName} ({subscription.SubscriptionId}) in {stopWatch.Elapsed.TotalSeconds:F2} seconds.");
                 }
                 catch (Exception ex)
                 {
-                    // Log the error or handle it in any other way
                     Console.WriteLine($"An error occurred while updating the subscription {sub.Data.DisplayName}: {ex.Message}");
                 }
             });
@@ -74,15 +86,15 @@ namespace Azure.Tenant.Automation
 
 
 
-            async Task UpdateSubscriptionTags(SubscriptionResource subscription)
+            static async Task UpdateSubscriptionTags(SubscriptionResource subscription, Program program)
             {
                 Dictionary<string, string> subscriptionTags = new Dictionary<string, string>(subscription.Data.Tags);
 
                 if (subscriptionTags.Any())
                 {
-                    var updatedTags = _program
+                    var updatedTags = program
                         .UpdateTagKeys(CreateAzureResource(subscriptionTags, subscription.Data.DisplayName, "subscription"))
-                        .Pipe(tags => _program.UpdateTagValues(CreateAzureResource(tags, subscription.Data.DisplayName, "subscription")));
+                        .Pipe(tags => program.UpdateTagValues(CreateAzureResource(tags, subscription.Data.DisplayName, "subscription")));
 
                     // Construct the TagResourceData object required to pass to subscription tag update
                     Tag tag = new();
@@ -90,9 +102,8 @@ namespace Azure.Tenant.Automation
                     {
                         tag.TagValues.Add(updatedTag.Key, updatedTag.Value);
                     }
-                    TagResourceData tags = new(tag);
-                    const Azure.WaitUntil wait = new();
-                    await subscription.GetTagResource().CreateOrUpdateAsync(wait, tags);
+                    TagResourceData tagResourceData = new(tag);
+                    await subscription.GetTagResource().CreateOrUpdateAsync(Azure.WaitUntil.Completed, tagResourceData);
                 }
                 else
                 {
@@ -100,26 +111,31 @@ namespace Azure.Tenant.Automation
                 }
             }
 
-            async Task UpdateResourceGroupsTags(SubscriptionResource subscription)
+            static async Task UpdateResourceGroupsTags(SubscriptionResource subscription, Program program, string targetResourceGroup)
             {
-                try
+                var resourceGroups = subscription.GetResourceGroups().ToList();
+                var tasks = resourceGroups.Select(async resourceGroup =>
                 {
-                    Parallel.ForEach(subscription.GetResourceGroups(), resourceGroup =>
+                    try
                     {
                         string resourceGroupName = resourceGroup.Data.Name;
-                        if (!String.IsNullOrEmpty(_targetResourceGroup) && resourceGroupName != _targetResourceGroup) return;
+                        if (!String.IsNullOrEmpty(targetResourceGroup) && resourceGroupName != targetResourceGroup) 
+                            return;
 
                         var resourceGroupTags = resourceGroup?.Data?.Tags;
 
-                        if (resourceGroupTags.Any())
+                        if (resourceGroupTags != null && resourceGroupTags.Any())
                         {
                             try
                             {
-                                var updatedTags = _program
+                                var updatedTags = program
                                     .UpdateTagKeys(CreateAzureResource(resourceGroupTags, resourceGroupName, "resource group"))
-                                    .Pipe(tags => _program.UpdateTagValues(CreateAzureResource(tags, resourceGroupName, "resource group")));
+                                    .Pipe(tags => program.UpdateTagValues(CreateAzureResource(tags, resourceGroupName, "resource group")));
 
-                                resourceGroup.SetTagsAsync(updatedTags).Wait();
+                                if (resourceGroup != null)
+                                {
+                                    await resourceGroup.SetTagsAsync(updatedTags);
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -131,35 +147,36 @@ namespace Azure.Tenant.Automation
                             Console.WriteLine($"No tags on resource {resourceGroupName}");
                         }
 
-                        try
+                        if (resourceGroup != null)
                         {
-                            UpdateResourcesTags(resourceGroup).Wait();
+                            try
+                            {
+                                await UpdateResourcesTags(resourceGroup, program);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error updating tags for resources in resource group {resourceGroupName}: {ex.Message}");
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error updating tags for resources in resource group {resourceGroupName}: {ex.Message}");
-                        }
-                    });
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var innerEx in ex.InnerExceptions)
-                    {
-                        Console.WriteLine($"Error processing one or more resource groups: {innerEx.Message}");
                     }
-                }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error processing resource group {resourceGroup.Data.Name}: {ex.Message}");
+                    }
+                });
 
+                await Task.WhenAll(tasks);
             }
 
-            async Task UpdateResourcesTags(ResourceGroupResource resourceGroup)
+            static async Task UpdateResourcesTags(ResourceGroupResource resourceGroup, Program program)
             {
-                var resources = resourceGroup.GetGenericResources();
+                var resources = resourceGroup.GetGenericResources().ToList();
 
-                if (resources != null)
+                if (resources != null && resources.Any())
                 {
-                    try
+                    var tasks = resources.Select(async resource =>
                     {
-                        Parallel.ForEach(resources, resource =>
+                        try
                         {
                             var resourceTags = resource?.Data?.Tags;
                             var resourceName = resource?.Data?.Name;
@@ -169,11 +186,14 @@ namespace Azure.Tenant.Automation
                             {
                                 try
                                 {
-                                  var updatedTags = _program
-                                    .UpdateTagKeys(CreateAzureResource(resourceTags, resourceName, resourceType))
-                                    .Pipe(tags => _program.UpdateTagValues(CreateAzureResource(tags, resourceName, resourceType)));
+                                    var updatedTags = program
+                                        .UpdateTagKeys(CreateAzureResource(resourceTags, resourceName ?? "unknown", resourceType?.ToString() ?? "unknown"))
+                                        .Pipe(tags => program.UpdateTagValues(CreateAzureResource(tags, resourceName ?? "unknown", resourceType?.ToString() ?? "unknown")));
 
-                                  resource?.SetTagsAsync(updatedTags).Wait();
+                                    if (resource != null)
+                                    {
+                                        await resource.SetTagsAsync(updatedTags);
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -184,20 +204,18 @@ namespace Azure.Tenant.Automation
                             {
                                 Console.WriteLine($"No tags on resource {resourceName}");
                             }
-                        });
-                    }
-                    catch (AggregateException ex)
-                    {
-                        foreach (var innerEx in ex.InnerExceptions)
-                        {
-                            Console.WriteLine($"Error processing one or more resources: {innerEx.Message}");
                         }
-                    }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error processing resource {resource?.Data?.Name}: {ex.Message}");
+                        }
+                    });
+
+                    await Task.WhenAll(tasks);
                 }
             }
 
-            AzureResource CreateAzureResource(IDictionary<string, string> tags, string name, string type) => new AzureResource(tags, name, type);
-            
+            static AzureResource CreateAzureResource(IDictionary<string, string> tags, string name, string type) => new AzureResource(tags, name, type);
         }
 
         public IDictionary<string, string> UpdateTagKeys(AzureResource resources)
